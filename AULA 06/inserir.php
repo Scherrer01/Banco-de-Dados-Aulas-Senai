@@ -2,27 +2,28 @@
 $nome = $_POST['nome'];
 $email = $_POST['email'];
 
-$conn = new mysqli(
-         "localhost",
-         "root",
-         "senaisp",
-         "livraria"
-);
+$conn = new mysqli("localhost", "root", "senaisp", "livraria");
 
 if ($conn->connect_error) {
     die("Erro de conexão: " . $conn->connect_error);
 }
 
-$sql = "INSERT INTO usuarios (nome, email) VALUES ('$nome', '$email')";
-if ($conn->query($sql) === TRUE) {
-    echo "Dados salvos com sucesso!";
+$stmt = $conn->prepare("INSERT INTO usuarios (nome, email) VALUES (?, ?)");
+$stmt->bind_param("ss", $nome, $email);
+
+if ($stmt->execute()) {
+    // Redireciona antes de qualquer saída
+    header("Location: index.html");
+    exit;
 } else {
-    echo "Erro: " . $conn->error;
-} 
+    echo "Erro ao salvar os dados: " . $stmt->error;
+}
 
+$stmt->close();
 $conn->close();
-header("Location: index.html"); //ou index.php, depensendo do seu arquivo principal
-exit;
-
-
 ?>
+
+<Style>
+
+</Style>
+

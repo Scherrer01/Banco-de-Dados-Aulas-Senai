@@ -1,7 +1,42 @@
+<style>
+    body {
+        background-color: lightgray;
+        color: black;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 20px;
+    }
+
+    form {
+        align-items: center;
+        border-radius: 10px;
+        border: solid;
+        border-color: gray;
+        display: grid;
+        justify-content: center;
+        background: linear-gradient(to top,gray, lightgray);
+        margin-top: 20vh;
+        box-shadow: 0px 0.5px 0.5px 1px;
+    }
+
+    button {
+        background-color: rgb(90, 228, 90);
+        border-radius: 12px;
+        border-bottom: 50px;
+        font-weight: bold;
+    }
+
+    label {
+      text-align: center;
+    }
+
+
+</style>
+
+<link rel="stylesheet" href="style.css">
 <form action="inserir.php" method="POST">
     <label>Nome:</label>
-    <input type="text" name="nome" required><br>
+    <input type="text" name="nome" required placeholder="Digite seu nome"><br>
     <label>Email:</label>
-    <input type="email" name="email" required><br>
+    <input type="email" name="email" required placeholder="Digite seu email"><br>
     <button type="submit" required>Enviar</button>
 </form>
