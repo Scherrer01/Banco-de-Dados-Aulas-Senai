@@ -1,0 +1,106 @@
+<?php
+require_once '../conexao.php';
+
+// Verificar se o ID foi passado
+if (!isset($_GET['id'])) {
+    header("Location: listar.php");
+    exit;
+}
+
+$id_funcionario = $_GET['id'];
+
+// Buscar dados do funcionário para confirmar
+$sql = "SELECT * FROM FUNCIONARIO WHERE ID_FUNCIONARIO = ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$id_funcionario]);
+$funcionario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Verificar se funcionário existe
+if (!$funcionario) {
+    header("Location: listar.php");
+    exit;
+}
+
+// Processar exclusão
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        // Verificar se o funcionário tem OS antes de excluir
+        $sql_os = "SELECT COUNT(*) as total FROM ATENDE WHERE ID_FUNCIONARIO = ?";
+        $stmt_os = $pdo->prepare($sql_os);
+        $stmt_os->execute([$id_funcionario]);
+        $os_count = $stmt_os->fetch(PDO::FETCH_ASSOC);
+        
+        if ($os_count['total'] > 0) {
+            $erro = "Não é possível excluir este funcionário pois existem ordens de serviço vinculadas a ele.";
+        } else {
+            $sql = "DELETE FROM FUNCIONARIO WHERE ID_FUNCIONARIO = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$id_funcionario]);
+            
+            header("Location: listar.php");
+            exit;
+        }
+    } catch (PDOException $e) {
+        $erro = "Erro ao excluir funcionário: " . $e->getMessage();
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excluir Funcionário - Oficina</title>
+    <link rel="stylesheet" href="formulario.css">
+</head>
+<body>
+    <div class="container">
+        <div class="form-wrapper">
+            <div class="header">
+                <h1>🗑️ Excluir Funcionário</h1>
+                <p>Confirmação de exclusão</p>
+            </div>
+
+            <?php if (isset($erro)): ?>
+                <div class="alert error">
+                    <?= $erro ?>
+                </div>
+                <div class="form-actions">
+                    <a href="listar.php" class="btn btn-secondary">Voltar</a>
+                </div>
+            <?php else: ?>
+                <div class="alert error">
+                    <strong>Atenção!</strong> Você está prestes a excluir o funcionário:<br>
+                    <strong><?= htmlspecialchars($funcionario['NOME_FUNCIONARIO']) ?></strong><br>
+                    CPF: <?= htmlspecialchars($funcionario['CPF_FUNCIONARIO']) ?>
+                </div>
+
+                <p style="text-align: center; color: #7f8c8d; margin-bottom: 20px;">
+                    Esta ação não pode ser desfeita. Tem certeza que deseja continuar?
+                </p>
+
+                <form method="POST" class="form-cadastro">
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-danger">Sim, Excluir Funcionário</button>
+                        <a href="listar.php" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <style>
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+    </style>
+</body>
+</html>
