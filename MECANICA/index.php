@@ -231,55 +231,58 @@ try {
                 <?php endif; ?>
             </div>
 
-            <!-- CARD ORDENS DE SERVIÇO -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">📋 Ordens de Serviço</h2>
-                    <a href="ordens-servico/criar.php" class="btn">+ Nova OS</a>
-                </div>
-                
-                <?php if (count($ordens_servico) > 0): ?>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Veículo</th>
-                                <th>Cliente</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($ordens_servico as $os): ?>
-                            <tr>
-                                <td title="<?= htmlspecialchars($os['MARCA'] . ' ' . $os['MODELO']) ?>">
-                                    <?= htmlspecialchars($os['MARCA'] . ' ' . $os['MODELO']) ?>
-                                </td>
-                                <td><?= htmlspecialchars($os['NOME_CLIENTE']) ?></td>
-                                <td>
-                                    <?php 
-                                    $status = $os['STATUS'] ?? 'Aberta';
-                                    $status_class = '';
-                                    if ($status == 'Concluída') $status_class = 'status-concluida';
-                                    elseif ($status == 'Em Andamento') $status_class = 'status-andamento';
-                                    else $status_class = 'status-aberta';
-                                    ?>
-                                    <span class="<?= $status_class ?>"><?= $status ?></span>
-                                </td>
-                                <td class="actions">
-                                    <a href="ordens-servico/detalhes.php?id=<?= $os['ID_OS'] ?>" class="btn-small btn-edit">Ver</a>
-                                    <a href="ordens-servico/editar.php?id=<?= $os['ID_OS'] ?>" class="btn-small btn-edit">Editar</a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <div class="view-all">
-                        <a href="ordens-servico/listar.php" class="btn">Ver Todos</a>
-                    </div>
-                <?php else: ?>
-                    <div class="empty-message">Nenhuma OS</div>
-                <?php endif; ?>
-            </div>
+           <!-- CARD ORDENS DE SERVIÇO -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📋 Ordens de Serviço</h2>
+        <a href="ordens-servico/cadastrar.php" class="btn">+ Nova OS</a>
+    </div>
+    
+    <?php if (count($ordens_servico) > 0): ?>
+        <table>
+            <thead>
+                <tr>
+                    <th>Veículo</th>
+                    <th>Cliente</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($ordens_servico as $os): ?>
+                <tr>
+                    <td title="<?= htmlspecialchars($os['MARCA'] . ' ' . $os['MODELO']) ?>">
+                        <?= htmlspecialchars($os['MARCA'] . ' ' . $os['MODELO']) ?>
+                    </td>
+                    <td><?= htmlspecialchars($os['NOME_CLIENTE']) ?></td>
+                    <td>
+                        <?php 
+                        $status = $os['STATUS'] ?? 'Aberta';
+                        $status_class = '';
+                        if ($status == 'Concluída' || $status == 'Concluida') $status_class = 'status-concluida';
+                        elseif ($status == 'Em Andamento' || $status == 'Em andamento') $status_class = 'status-andamento';
+                        else $status_class = 'status-aberta';
+                        ?>
+                        <span class="<?= $status_class ?>"><?= $status ?></span>
+                    </td>
+                    <td class="actions">
+                        <a href="ordens-servico/visualizar.php?id=<?= $os['ID_OS'] ?>" class="btn-small btn-edit">Ver</a>
+                        <a href="ordens-servico/editar.php?id=<?= $os['ID_OS'] ?>" class="btn-small btn-edit">Editar</a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <div class="view-all">
+            <a href="ordens-servico/listar.php" class="btn">Ver Todos</a>
+        </div>
+    <?php else: ?>
+        <div class="empty-message">Nenhuma OS</div>
+        <div class="view-all">
+            <a href="ordens-servico/cadastrar.php" class="btn">Criar Primeira OS</a>
+        </div>
+    <?php endif; ?>
+</div>
         </div>
 
         <footer>

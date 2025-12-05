@@ -85,9 +85,11 @@ $status_class = 'status-' . strtolower(str_replace(' ', '-', $status));
                     <p><strong>Data Abertura:</strong> <?= date('d/m/Y', strtotime($os['DATA_ABERTURA'])) ?></p>
                     <p><strong>Data Conclusão:</strong> <?= $os['DATA_CONCLUSAO'] ? date('d/m/Y', strtotime($os['DATA_CONCLUSAO'])) : 'Em andamento' ?></p>
                     <p><strong>Status:</strong> 
-                        <span class="status-badge <?= $status_class ?>">
-                            <?= $status ?>
-                        </span>
+                        <?php 
+$status = isset($os['STATUS']) ? $os['STATUS'] : ($os['DATA_CONCLUSAO'] ? 'Concluída' : 'Aberta');
+$status_class = 'status-' . strtolower(str_replace(' ', '-', $status));
+?>
+<span class="status-badge <?= $status_class ?>"><?= $status ?></span>
                     </p>
                 </div>
 

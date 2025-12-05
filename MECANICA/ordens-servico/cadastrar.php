@@ -7,6 +7,20 @@ $servicos = $pdo->query("SELECT * FROM SERVICO ORDER BY NOME_SERVICO")->fetchAll
 $pecas = $pdo->query("SELECT * FROM PECAS ORDER BY NOME_PECA")->fetchAll();
 $funcionarios = $pdo->query("SELECT * FROM FUNCIONARIO ORDER BY NOME_FUNCIONARIO")->fetchAll();
 
+// TESTE: Verificar estrutura da tabela OS
+try {
+    $teste = $pdo->query("SHOW COLUMNS FROM OS LIKE 'STATUS'");
+    $coluna_existe = $teste->fetch();
+    
+    if (!$coluna_existe) {
+        // Coluna não existe - vamos tentar criar
+        $pdo->exec("ALTER TABLE OS ADD COLUMN STATUS VARCHAR(50) DEFAULT 'Aberta'");
+        error_log("Coluna STATUS adicionada à tabela OS");
+    }
+} catch (Exception $e) {
+    error_log("Erro ao verificar coluna STATUS: " . $e->getMessage());
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
@@ -15,10 +29,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id_veiculo = $_POST['id_veiculo'];
         $observacoes = substr($_POST['observacoes'], 0, 500);
         
-        // Inserir OS
-        $sql_os = "INSERT INTO OS (ID_VEICULO, OBS, TOTAL, STATUS) VALUES (?, ?, 0, 'Aberta')";
-        $stmt_os = $pdo->prepare($sql_os);
-        $stmt_os->execute([$id_veiculo, $observacoes]);
+        // OPÇÃO 1: Inserir sem STATUS (se a coluna não existir)
+        try {
+            // Tenta inserir com STATUS
+            $sql_os = "INSERT INTO OS (ID_VEICULO, OBS, TOTAL, STATUS, DATA_ABERTURA) VALUES (?, ?, 0, 'Aberta', CURDATE())";
+            $stmt_os = $pdo->prepare($sql_os);
+            $stmt_os->execute([$id_veiculo, $observacoes]);
+        } catch (PDOException $e) {
+            // Se falhar, tenta sem STATUS
+            $sql_os = "INSERT INTO OS (ID_VEICULO, OBS, TOTAL, DATA_ABERTURA) VALUES (?, ?, 0, CURDATE())";
+            $stmt_os = $pdo->prepare($sql_os);
+            $stmt_os->execute([$id_veiculo, $observacoes]);
+        }
+        
         $id_os = $pdo->lastInsertId();
         
         $total_os = 0;
@@ -38,8 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Processar peças selecionadas
         if (isset($_POST['pecas']) && is_array($_POST['pecas'])) {
             foreach ($_POST['pecas'] as $id_peca) {
-                $peca = $pdo->query("SELECT PRECO FROM PECAS WHERE ID_PECA = $id_peca")->fetch();
+                $peca = $pdo->query("SELECT PRECO, QUANTIDADE FROM PECAS WHERE ID_PECA = $id_peca")->fetch();
                 $quantidade = $_POST['quantidade_peca'][$id_peca] ?? 1;
+                
+                // Verificar estoque
+                if ($quantidade > $peca['QUANTIDADE']) {
+                    throw new Exception("Estoque insuficiente. Disponível: {$peca['QUANTIDADE']}");
+                }
+                
                 $total_os += $peca['PRECO'] * $quantidade;
                 
                 $sql_peca = "INSERT INTO UTILIZA (ID_OS, ID_PECA, QUANTIDADE) VALUES (?, ?, ?)";
@@ -62,6 +91,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        // Verificar se pelo menos um serviço ou peça foi selecionado
+        if (!isset($_POST['servicos']) && !isset($_POST['pecas'])) {
+            throw new Exception("Selecione pelo menos um serviço ou uma peça.");
+        }
+        
+        // Verificar se pelo menos um funcionário foi selecionado
+        if (!isset($_POST['funcionarios'])) {
+            throw new Exception("Selecione pelo menos um funcionário.");
+        }
+        
         // Atualizar total da OS
         $sql_update_total = "UPDATE OS SET TOTAL = ? WHERE ID_OS = ?";
         $stmt_update = $pdo->prepare($sql_update_total);
@@ -71,9 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: listar.php?sucesso=1");
         exit;
         
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         $pdo->rollBack();
         $erro = "Erro ao criar ordem de serviço: " . $e->getMessage();
+        error_log("ERRO OS: " . $e->getMessage());
     }
 }
 ?>
@@ -83,16 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Criar Ordem de Serviço - Oficina</title>
-    <link rel="stylesheet" href="criar.css">
-    
+    <title>Cadastrar Ordem de Serviço - Oficina</title>
+    <link rel="stylesheet" href="cadastrar.css">
 </head>
 <body>
     <div class="container">
         <div class="form-wrapper">
             <div class="header">
                 <h1>📋 Nova Ordem de Serviço</h1>
-                <p>Crie uma nova ordem de serviço</p>
+                <p>Preencha os dados da nova ordem de serviço</p>
             </div>
 
             <?php if (isset($erro)): ?>
@@ -101,7 +140,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" class="form-cadastro">
+            <?php if (isset($_GET['sucesso'])): ?>
+                <div class="alert success">
+                    Ordem de serviço criada com sucesso!
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" class="form-cadastro" id="formOS">
                 <!-- Seção Veículo -->
                 <div class="secao">
                     <h3>🚗 Veículo</h3>
@@ -123,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Seção Serviços -->
                 <div class="secao">
                     <h3>🛠️ Serviços</h3>
+                    <p class="section-desc">Selecione os serviços a serem realizados</p>
                     <div class="checkbox-group">
                         <?php foreach ($servicos as $servico): ?>
                             <div class="checkbox-item">
@@ -140,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Seção Peças -->
                 <div class="secao">
                     <h3>⚙️ Peças</h3>
+                    <p class="section-desc">Selecione as peças a serem utilizadas</p>
                     <div class="checkbox-group">
                         <?php foreach ($pecas as $peca): ?>
                             <div class="checkbox-item">
@@ -155,9 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        max="<?= $peca['QUANTIDADE'] ?>" 
                                        id="quantidade_<?= $peca['ID_PECA'] ?>" 
                                        style="display: none;">
-                                <small style="color: #7f8c8d; margin-left: 5px;">
-                                    (<?= $peca['QUANTIDADE'] ?> em estoque)
-                                </small>
+                                <small class="estoque">(<?= $peca['QUANTIDADE'] ?> em estoque)</small>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -166,6 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Seção Funcionários -->
                 <div class="secao">
                     <h3>🔧 Funcionários Responsáveis</h3>
+                    <p class="section-desc">Selecione os funcionários que atenderão esta OS</p>
                     <div class="checkbox-group">
                         <?php foreach ($funcionarios as $funcionario): ?>
                             <div class="checkbox-item">
@@ -174,6 +220,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <label for="funcionario_<?= $funcionario['ID_FUNCIONARIO'] ?>">
                                     <?= htmlspecialchars($funcionario['NOME_FUNCIONARIO']) ?>
                                 </label>
+                                <?php if (!empty($funcionario['ESPECIALIDADE'])): ?>
+                                    <small class="especialidade">(<?= htmlspecialchars($funcionario['ESPECIALIDADE']) ?>)</small>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -182,11 +231,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Observações -->
                 <div class="form-group">
                     <label for="observacoes">Observações</label>
-                    <textarea id="observacoes" name="observacoes" rows="3" maxlength="500" placeholder="Observações sobre o serviço..."></textarea>
+                    <textarea id="observacoes" name="observacoes" rows="3" maxlength="500" 
+                              placeholder="Observações sobre o serviço, problemas identificados, etc..."></textarea>
+                    <small class="char-count">Máximo 500 caracteres</small>
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Criar Ordem de Serviço</button>
+                    <button type="submit" class="btn btn-primary" onclick="return validarForm()">Criar Ordem de Serviço</button>
                     <a href="listar.php" class="btn btn-secondary">Cancelar</a>
                 </div>
             </form>
@@ -196,8 +247,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script>
         function toggleQuantidade(checkbox, idPeca) {
             const quantidadeInput = document.getElementById('quantidade_' + idPeca);
-            quantidadeInput.style.display = checkbox.checked ? 'block' : 'none';
+            quantidadeInput.style.display = checkbox.checked ? 'inline-block' : 'none';
+        }
+        
+        function validarForm() {
+            const veiculo = document.getElementById('id_veiculo').value;
+            if (!veiculo) {
+                alert('Por favor, selecione um veículo!');
+                return false;
+            }
+            
+            const servicos = document.querySelectorAll('input[name="servicos[]"]:checked');
+            const pecas = document.querySelectorAll('input[name="pecas[]"]:checked');
+            const funcionarios = document.querySelectorAll('input[name="funcionarios[]"]:checked');
+            
+            if (servicos.length === 0 && pecas.length === 0) {
+                alert('Selecione pelo menos um serviço ou uma peça!');
+                return false;
+            }
+            
+            if (funcionarios.length === 0) {
+                alert('Selecione pelo menos um funcionário!');
+                return false;
+            }
+            
+            return true;
         }
     </script>
+
+    <style>
+        .secao {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        .secao h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .section-desc {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .checkbox-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        .checkbox-item:hover {
+            border-color: #3498db;
+            box-shadow: 0 2px 5px rgba(52, 152, 219, 0.2);
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .checkbox-item label {
+            flex-grow: 1;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .preco {
+            background: #2ecc71;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .estoque {
+            color: #7f8c8d;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        .especialidade {
+            color: #3498db;
+            margin-left: 10px;
+            font-size: 12px;
+            font-style: italic;
+        }
+        .quantidade-input {
+            width: 60px;
+            margin-left: 10px;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .char-count {
+            display: block;
+            text-align: right;
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
 </body>
 </html>
